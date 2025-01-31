@@ -1,10 +1,10 @@
 "use client";
 
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/lib/card';
 import Papa from 'papaparse';
 import { Trophy, Award } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const TriviaGame = () => {
     const [questions, setQuestions] = useState([]);
@@ -18,25 +18,34 @@ const TriviaGame = () => {
     const [loadingShared, setLoadingShared] = useState(true);
 
     useEffect(() => {
+        const loadSharedGame = async (gameId) => {
+            try {
+                const { data, error } = await supabase
+                    .from('trivia_games')
+                    .select('questions')
+                    .eq('game_id', gameId)
+                    .single();
+
+                if (error) throw error;
+                
+                if (data) {
+                    setQuestions(data.questions);
+                    setIsSharedGame(true);
+                }
+            } catch (error) {
+                console.error('Error loading shared game:', error);
+                alert('Error loading the shared game. Please try again.');
+            } finally {
+                setLoadingShared(false);
+            }
+        };
+
         const params = new URLSearchParams(window.location.search);
         const gameId = params.get('gameId');
+        
         if (gameId) {
             setLoadingShared(true);
-            setTimeout(() => {
-                const mockQuestions = [
-                    {
-                        question: "Sample shared question?",
-                        answer1: "Option 1",
-                        answer2: "Option 2",
-                        answer3: "Option 3",
-                        answer4: "Option 4",
-                        correct_index: 1
-                    }
-                ];
-                setQuestions(mockQuestions);
-                setIsSharedGame(true);
-                setLoadingShared(false);
-            }, 1000);
+            loadSharedGame(gameId);
         } else {
             setLoadingShared(false);
         }
@@ -60,6 +69,28 @@ const TriviaGame = () => {
             reader.readAsText(file);
         }
     }, []);
+
+    const handleShare = async (questions) => {
+        try {
+            const gameId = Math.random().toString(36).substring(2, 15);
+            
+            const { data, error } = await supabase
+                .from('trivia_games')
+                .insert([
+                    { 
+                        game_id: gameId,
+                        questions: questions
+                    }
+                ]);
+
+            if (error) throw error;
+            
+            return gameId;
+        } catch (error) {
+            console.error('Error saving game:', error);
+            throw error;
+        }
+    };
 
     const handleStartGame = () => {
         if (questions.length > 0) {
@@ -182,7 +213,8 @@ const TriviaGame = () => {
                                         <button
                                             onClick={async () => {
                                                 try {
-                                                    const url = `${window.location.origin}?gameId=mock-id`;
+                                                    const gameId = await handleShare(questions);
+                                                    const url = `${window.location.origin}?gameId=${gameId}`;
                                                     setShareUrl(url);
                                                     await navigator.clipboard.writeText(url);
                                                     alert('Share link copied to clipboard!');
