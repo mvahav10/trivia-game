@@ -4,7 +4,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/lib/card';
 import Papa from 'papaparse';
 import { Trophy, Award } from 'lucide-react';   
-"use client";
 
 let supabase;
 if (typeof window !== 'undefined') {
