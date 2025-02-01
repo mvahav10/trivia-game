@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/lib/card';
 import Papa from 'papaparse';
-import { Trophy, Award } from 'lucide-react';
+import { Trophy, Award } from 'lucide-react';   
 "use client";
 
 let supabase;
@@ -77,7 +77,15 @@ const TriviaGame = () => {
 
     const handleShare = async (questions) => {
         try {
+            console.log('HandleShare started');
+            console.log('Supabase instance:', supabase); // Check if supabase is initialized
+            
+            if (!supabase) {
+                throw new Error('Supabase not initialized');
+            }
+            
             const gameId = Math.random().toString(36).substring(2, 15);
+            console.log('Generated gameId:', gameId);
             
             const { data, error } = await supabase
                 .from('trivia_games')
@@ -87,13 +95,17 @@ const TriviaGame = () => {
                         questions: questions
                     }
                 ]);
-
-            if (error) throw error;
+    
+            if (error) {
+                console.error('Supabase error:', error);
+                throw error;
+            }
             
+            console.log('Save successful:', data);
             return gameId;
         } catch (error) {
-            console.error('Error saving game:', error);
-            throw error;
+            console.error('Error in handleShare:', error);
+            throw error; // Re-throw to be caught by the button's error handler
         }
     };
 
@@ -216,22 +228,29 @@ const TriviaGame = () => {
                                             <span>{questions.length} questions loaded</span>
                                         </div>
                                         <button
-                                            onClick={async () => {
-                                                try {
-                                                    const gameId = await handleShare(questions);
-                                                    const url = `${window.location.origin}?gameId=${gameId}`;
-                                                    setShareUrl(url);
-                                                    await navigator.clipboard.writeText(url);
-                                                    alert('Share link copied to clipboard!');
-                                                } catch (error) {
-                                                    console.error('Error sharing game:', error);
-                                                    alert('Error creating share link. Please try again.');
-                                                }
-                                            }}
-                                            className="w-full py-2 px-4 bg-green-500 text-white rounded-md hover:bg-green-600"
-                                        >
-                                            Generate Share Link
-                                        </button>
+    onClick={async () => {
+        try {
+            console.log('Starting share process...');
+            console.log('Questions to save:', questions); // Log questions being saved
+            
+            const gameId = await handleShare(questions);
+            console.log('Received gameId:', gameId);
+            
+            const url = `${window.location.origin}?gameId=${gameId}`;
+            console.log('Generated URL:', url);
+            
+            setShareUrl(url);
+            await navigator.clipboard.writeText(url);
+            alert('Share link copied to clipboard!');
+        } catch (error) {
+            console.error('Detailed error:', error); // More detailed error logging
+            alert('Error creating share link: ' + error.message);
+        }
+    }}
+    className="w-full py-2 px-4 bg-green-500 text-white rounded-md hover:bg-green-600"
+>
+    Generate Share Link
+</button>
                                         {shareUrl && (
                                             <div className="p-2 bg-gray-100 rounded-md">
                                                 <p className="text-sm text-gray-600 break-all">{shareUrl}</p>
