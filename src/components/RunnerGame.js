@@ -1,39 +1,40 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { useAnimations, useGLTF, OrbitControls, Environment } from '@react-three/drei';
 
-const RunnerFigure = ({ speed }) => (
-  <svg 
-    width="32" 
-    height="32" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke={speed > 2 ? '#16a34a' : '#2563eb'} 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round"
-  >
-    {/* Simple stick figure runner */}
-    <circle cx="12" cy="6" r="4" /> {/* Head */}
-    <line x1="12" y1="10" x2="12" y2="16" /> {/* Body */}
-    <line x1="8" y1="20" x2="12" y2="16" /> {/* Left leg */}
-    <line x1="16" y1="20" x2="12" y2="16" /> {/* Right leg */}
-    <line x1="6" y1="14" x2="12" y2="12" /> {/* Left arm */}
-    <line x1="18" y1="14" x2="12" y2="12" /> {/* Right arm */}
-  </svg>
-);
+// Configure GLTFLoader for your model path
+useGLTF.preload('./runner.glb'); // Adjust this path to where your model is located
+
+function Runner({ speed, isRunning }) {
+  const group = useRef();
+  const { scene, animations } = useGLTF('./runner.glb'); // Adjust this path as well
+  const { actions } = useAnimations(animations, group);
+
+  useEffect(() => {
+    // Adjust animation speed based on correct answers
+    const currentAction = actions?.run; // Use optional chaining as animations might not be loaded yet
+    if (currentAction) {
+      currentAction.setEffectiveTimeScale(speed);
+      if (isRunning) {
+        currentAction.play();
+      } else {
+        currentAction.stop();
+      }
+    }
+  }, [actions, speed, isRunning]);
+
+  return <primitive object={scene} ref={group} />;
+}
 
 const RunnerGame = ({ 
   correctAnswers = 0, 
   totalQuestions = 0,
-  timeRemaining = 120, // 2 minutes in seconds
+  timeRemaining = 120,
   isGameActive = true
 }) => {
-  const [distance, setDistance] = useState(0);
-  const [speed, setSpeed] = useState(1);
-  const [animation, setAnimation] = useState('');
-  const requestRef = useRef();
-  const previousTimeRef = useRef();
+  const [speed, setSpeed] = React.useState(1);
+  const [distance, setDistance] = React.useState(0);
 
-  // Calculate speed based on correct answers
   useEffect(() => {
     const baseSpeed = 1;
     const speedMultiplier = 0.5;
@@ -41,80 +42,79 @@ const RunnerGame = ({
     setSpeed(newSpeed);
   }, [correctAnswers]);
 
-  // Animation loop
-  const animate = (time) => {
-    if (previousTimeRef.current !== undefined) {
-      const deltaTime = time - previousTimeRef.current;
-      
-      // Update distance based on speed and time
-      setDistance(prevDistance => {
-        const newDistance = prevDistance + (speed * deltaTime * 0.01);
-        return newDistance;
-      });
-    }
-    previousTimeRef.current = time;
-    requestRef.current = requestAnimationFrame(animate);
-  };
-
-  // Start/stop animation based on game state
+  // Calculate distance
   useEffect(() => {
     if (isGameActive) {
-      requestRef.current = requestAnimationFrame(animate);
+      const interval = setInterval(() => {
+        setDistance(prev => prev + speed * 0.1);
+      }, 100);
+      return () => clearInterval(interval);
     }
-    return () => cancelAnimationFrame(requestRef.current);
-  }, [isGameActive]);
-
-  // Runner animation class based on speed
-  useEffect(() => {
-    const animationClass = speed > 2 ? 'animate-bounce' : 'animate-pulse';
-    setAnimation(animationClass);
-  }, [speed]);
+  }, [speed, isGameActive]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      {/* Progress Stats */}
-      <div className="flex justify-between mb-4">
-        <div className="text-sm">
-          Speed: {speed.toFixed(1)}x
+    <div className="w-full max-w-4xl mx-auto p-4 bg-gradient-to-b from-sky-100 to-white rounded-xl shadow-lg">
+      {/* Stats Bar */}
+      <div className="flex justify-between mb-4 text-sm font-medium">
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
+          <span>Speed: {speed.toFixed(1)}x</span>
         </div>
-        <div className="text-sm">
-          Distance: {Math.floor(distance)}m
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+          <span>Distance: {Math.floor(distance)}m</span>
         </div>
-        <div className="text-sm">
-          Time: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-purple-500 mr-2" />
+          <span>Time: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}</span>
         </div>
       </div>
 
-      {/* Runner Track */}
-      <div className="relative w-full h-24 bg-gradient-to-r from-blue-100 to-blue-50 rounded-lg overflow-hidden">
-        {/* Runner Character */}
-        <div 
-          className={`absolute bottom-4 left-8 transform ${animation}`}
-          style={{
-            transition: 'transform 0.3s ease-in-out'
-          }}
-        >
-          <RunnerFigure speed={speed} />
-        </div>
-
-        {/* Track Markers */}
-        <div className="absolute bottom-0 w-full h-1 bg-gray-300" />
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute bottom-1 w-1 h-2 bg-gray-400"
-            style={{ left: `${(i + 1) * 12.5}%` }}
+      {/* 3D Runner Scene */}
+      <div className="w-full h-64 rounded-lg overflow-hidden">
+        <Canvas shadows>
+          <color attach="background" args={['#f0f9ff']} />
+          
+          {/* Lighting */}
+          <ambientLight intensity={0.5} />
+          <directionalLight
+            position={[10, 10, 10]}
+            castShadow
+            shadow-mapSize={[1024, 1024]}
           />
-        ))}
+
+          {/* Ground */}
+          <mesh 
+            rotation={[-Math.PI / 2, 0, 0]} 
+            position={[0, -1, 0]} 
+            receiveShadow
+          >
+            <planeGeometry args={[100, 100]} />
+            <meshStandardMaterial color="#f0f9ff" />
+          </mesh>
+
+          {/* Runner */}
+          <Runner speed={speed} isRunning={isGameActive} />
+
+          {/* Camera Controls */}
+          <OrbitControls 
+            enableZoom={false}
+            enablePan={false}
+            maxPolarAngle={Math.PI / 2}
+            minPolarAngle={Math.PI / 4}
+          />
+        </Canvas>
       </div>
 
-      {/* Game Stats */}
+      {/* Progress Stats */}
       <div className="mt-4 flex justify-between text-sm text-gray-600">
-        <div>
-          Correct: {correctAnswers}/{totalQuestions}
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
+          <span>Correct: {correctAnswers}/{totalQuestions}</span>
         </div>
-        <div>
-          Accuracy: {totalQuestions > 0 ? ((correctAnswers / totalQuestions) * 100).toFixed(1) : 0}%
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+          <span>Accuracy: {totalQuestions > 0 ? ((correctAnswers / totalQuestions) * 100).toFixed(1) : 0}%</span>
         </div>
       </div>
     </div>
