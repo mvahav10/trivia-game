@@ -10,7 +10,9 @@
   "dependencies": {
     "@react-three/drei": "^9.99.0",
     "@react-three/fiber": "^8.15.0",
+    "@supabase/supabase-js": "^2.48.1",
     "next": "^15.1.6",
+    "papaparse": "^5.5.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "three": "^0.160.0"
