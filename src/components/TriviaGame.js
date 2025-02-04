@@ -3,37 +3,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/lib/card';
 import Papa from 'papaparse';
-import RunnerGame from './RunnerGame'; 
-// SVG components to replace Lucide icons
-const TrophyIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9H4.5C3.12 9 2 7.88 2 6.5C2 5.12 3.12 4 4.5 4H6"/>
-      <path d="M18 9h1.5c1.38 0 2.5-1.12 2.5-2.5C22 5.12 20.88 4 19.5 4H18"/>
-      <path d="M4 22h16"/>
-      <path d="M10 14.66V17c0 .55-.47 1-1.02 1H6.08c-.54 0-.98-.45-.98-1v-2.34"/>
-      <path d="M14 14.66V17c0 .55.47 1 1.02 1h2.9c.54 0 .98-.45.98-1v-2.34"/>
-      <path d="M18 2H6v7c0 3.31 2.69 6 6 6s6-2.69 6-6V2z"/>
-    </svg>
-  );
-  
-  const AwardIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="6"/>
-      <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-    </svg>
-  );
-  
-
-  import { createClient } from '@supabase/supabase-js';
-
-  let supabase;
-  if (typeof window !== 'undefined') {
-      // Initialize supabase synchronously
-      supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      );
-  }
+import { Trophy, Award } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const TriviaGame = () => {
     const [questions, setQuestions] = useState([]);
@@ -45,15 +16,6 @@ const TriviaGame = () => {
     const [isSharedGame, setIsSharedGame] = useState(false);
     const [shareUrl, setShareUrl] = useState('');
     const [loadingShared, setLoadingShared] = useState(true);
-    const [timeRemaining, setTimeRemaining] = useState(120); // 2 minutes
-const [isGameActive, setIsGameActive] = useState(true);
-const [gameStats, setGameStats] = useState({
-    totalTime: 120,
-    correctAnswers: 0,
-    totalQuestions: 0,
-});
-
-    
 
     useEffect(() => {
         const loadSharedGame = async (gameId) => {
@@ -77,7 +39,6 @@ const [gameStats, setGameStats] = useState({
                 setLoadingShared(false);
             }
         };
-        
 
         const params = new URLSearchParams(window.location.search);
         const gameId = params.get('gameId');
@@ -89,22 +50,6 @@ const [gameStats, setGameStats] = useState({
             setLoadingShared(false);
         }
     }, []);
-    useEffect(() => {
-        if (!gameStarted || !isGameActive) return;
-    
-        const timer = setInterval(() => {
-            setTimeRemaining((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleGameEnd();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-    
-        return () => clearInterval(timer);
-    }, [gameStarted, isGameActive]);
 
     const handleFileUpload = useCallback((event) => {
         const file = event.target.files[0];
@@ -127,15 +72,7 @@ const [gameStats, setGameStats] = useState({
 
     const handleShare = async (questions) => {
         try {
-            console.log('HandleShare started');
-            console.log('Supabase instance:', supabase); // Check if supabase is initialized
-            
-            if (!supabase) {
-                throw new Error('Supabase not initialized');
-            }
-            
             const gameId = Math.random().toString(36).substring(2, 15);
-            console.log('Generated gameId:', gameId);
             
             const { data, error } = await supabase
                 .from('trivia_games')
@@ -145,17 +82,13 @@ const [gameStats, setGameStats] = useState({
                         questions: questions
                     }
                 ]);
-    
-            if (error) {
-                console.error('Supabase error:', error);
-                throw error;
-            }
+
+            if (error) throw error;
             
-            console.log('Save successful:', data);
             return gameId;
         } catch (error) {
-            console.error('Error in handleShare:', error);
-            throw error; // Re-throw to be caught by the button's error handler
+            console.error('Error saving game:', error);
+            throw error;
         }
     };
 
@@ -166,37 +99,6 @@ const [gameStats, setGameStats] = useState({
             setScore(0);
             setShowAnswer(false);
             setSelectedAnswer(null);
-            setTimeRemaining(120);
-            setIsGameActive(true);
-            setGameStats({
-                totalTime: 120,
-                correctAnswers: 0,
-                totalQuestions: questions.length,
-            });
-        }
-    };
-    const handleGameEnd = async () => {
-        setIsGameActive(false);
-        
-        const finalStats = {
-            totalTime: 120 - timeRemaining,
-            correctAnswers: score,
-            totalQuestions: questions.length,
-        };
-        setGameStats(finalStats);
-    
-        if (isSharedGame) {
-            try {
-                await supabase
-                    .from('trivia_games')
-                    .update({ 
-                        stats: finalStats,
-                        completed_at: new Date().toISOString()
-                    })
-                    .eq('game_id', gameId);
-            } catch (error) {
-                console.error('Error saving game stats:', error);
-            }
         }
     };
 
@@ -210,7 +112,6 @@ const [gameStats, setGameStats] = useState({
         if (selectedAnswer !== null) {
             if (selectedAnswer === questions[currentQuestion].correct_index) {
                 setScore(score + 1);
-                // The RunnerGame will automatically update based on the new score
             }
             setShowAnswer(true);
         }
@@ -221,8 +122,6 @@ const [gameStats, setGameStats] = useState({
             setCurrentQuestion(currentQuestion + 1);
             setShowAnswer(false);
             setSelectedAnswer(null);
-        } else {
-            handleGameEnd();
         }
     };
 
@@ -277,65 +176,57 @@ const [gameStats, setGameStats] = useState({
                                 <p className="text-gray-600">Loading shared game...</p>
                             </div>
                         </CardContent>
-                        </Card>
-                    ) : !gameStarted ? (
-                        <Card className="backdrop-blur-lg bg-white bg-opacity-90 shadow-xl">
-                            <CardContent className="p-8 space-y-6">
-                                <div className="text-center mb-8">
-                                    <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                                        Trivia Challenge
-                                    </h1>
-                                    <p className="text-gray-600 mt-2">Test your knowledge and have fun!</p>
-                                </div>
-                                
-                                <div className="space-y-4">
-                                    
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Upload Your Questions
-                                    </label>
-                                    <input
-                                        type="file"
-                                        accept=".csv"
-                                        onChange={handleFileUpload}
-                                        className="block w-full text-sm text-gray-500 
-                                            file:mr-4 file:py-3 file:px-6 
-                                            file:rounded-full file:border-0 
-                                            file:text-sm file:font-medium
-                                            file:bg-gradient-to-r file:from-blue-500 file:to-purple-500
-                                            file:text-white
-                                            hover:file:opacity-90
-                                            cursor-pointer"
-                                    />
-                                    {questions.length > 0 && !isSharedGame && (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center text-green-600">
-                                                <AwardIcon className="w-5 h-5 mr-2" />
-                                                <span>{questions.length} questions loaded</span>
-                                            </div>
-                                            <button
-        onClick={async () => {
-            try {
-                console.log('Starting share process...');
-                console.log('Questions to save:', questions); // Log questions being saved
-                
-                const gameId = await handleShare(questions);
-                console.log('Received gameId:', gameId);
-                
-                const url = `${window.location.origin}?gameId=${gameId}`;
-                console.log('Generated URL:', url);
-                
-                setShareUrl(url);
-                await navigator.clipboard.writeText(url);
-                alert('Share link copied to clipboard!');
-            } catch (error) {
-                console.error('Detailed error:', error); // More detailed error logging
-                alert('Error creating share link: ' + error.message);
-            }
-        }}
-        className="w-full py-2 px-4 bg-green-500 text-white rounded-md hover:bg-green-600"
-    >
-        Generate Share Link
-    </button>
+                    </Card>
+                ) : !gameStarted ? (
+                    <Card className="backdrop-blur-lg bg-white bg-opacity-90 shadow-xl">
+                        <CardContent className="p-8 space-y-6">
+                            <div className="text-center mb-8">
+                                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                    Trivia Challenge
+                                </h1>
+                                <p className="text-gray-600 mt-2">Test your knowledge and have fun!</p>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Upload Your Questions
+                                </label>
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    onChange={handleFileUpload}
+                                    className="block w-full text-sm text-gray-500 
+                                        file:mr-4 file:py-3 file:px-6 
+                                        file:rounded-full file:border-0 
+                                        file:text-sm file:font-medium
+                                        file:bg-gradient-to-r file:from-blue-500 file:to-purple-500
+                                        file:text-white
+                                        hover:file:opacity-90
+                                        cursor-pointer"
+                                />
+                                {questions.length > 0 && !isSharedGame && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center text-green-600">
+                                            <Award className="w-5 h-5 mr-2" />
+                                            <span>{questions.length} questions loaded</span>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    const gameId = await handleShare(questions);
+                                                    const url = `${window.location.origin}?gameId=${gameId}`;
+                                                    setShareUrl(url);
+                                                    await navigator.clipboard.writeText(url);
+                                                    alert('Share link copied to clipboard!');
+                                                } catch (error) {
+                                                    console.error('Error sharing game:', error);
+                                                    alert('Error creating share link. Please try again.');
+                                                }
+                                            }}
+                                            className="w-full py-2 px-4 bg-green-500 text-white rounded-md hover:bg-green-600"
+                                        >
+                                            Generate Share Link
+                                        </button>
                                         {shareUrl && (
                                             <div className="p-2 bg-gray-100 rounded-md">
                                                 <p className="text-sm text-gray-600 break-all">{shareUrl}</p>
@@ -353,107 +244,95 @@ const [gameStats, setGameStats] = useState({
                                         disabled:from-gray-400 disabled:to-gray-500
                                         flex items-center justify-center space-x-2"
                                 >
-                                    <TrophyIcon className="w-5 h-5" />
+                                    <Trophy className="w-5 h-5" />
                                     <span>Start Challenge</span>
                                 </button>
                             </div>
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="space-y-4">
-                        <RunnerGame
-                            correctAnswers={score}
-                            totalQuestions={questions.length}
-                            timeRemaining={timeRemaining}
-                            isGameActive={isGameActive}
-                        />
-                        
-                        <Card className="backdrop-blur-lg bg-white bg-opacity-90 shadow-xl">
-                            <CardContent className="p-6 space-y-4">
-                                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
-                                        style={{ width: `${progressPercentage}%` }}
-                                    />
+                    <Card className="backdrop-blur-lg bg-white bg-opacity-90 shadow-xl">
+                        <CardContent className="p-6 space-y-4">
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                                    style={{ width: `${progressPercentage}%` }}
+                                />
+                            </div>
+                            
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-600">
+                                    Question {currentQuestion + 1}/{questions.length}
+                                </span>
+                                <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-1 rounded-full">
+                                    <Trophy className="w-4 h-4" />
+                                    <span>{score}</span>
                                 </div>
+                            </div>
+                            
+                            <div className="py-4">
+                                <h2 className="text-xl font-bold text-gray-800 mb-6">
+                                    {questions[currentQuestion].question}
+                                </h2>
                                 
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm font-medium text-gray-600">
-                                        Question {currentQuestion + 1}/{questions.length}
-                                    </span>
-                                    <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-1 rounded-full">
-                                        <TrophyIcon className="w-4 h-4" />
-                                        <span>{score}</span>
-                                    </div>
+                                <div className="space-y-3">
+                                    {[1, 2, 3, 4].map(index => getAnswerButton(index))}
                                 </div>
-                                
-                                <div className="py-4">
-                                    <h2 className="text-xl font-bold text-gray-800 mb-6">
-                                        {questions[currentQuestion].question}
-                                    </h2>
-                                    
-                                    <div className="space-y-3">
-                                        {[1, 2, 3, 4].map(index => getAnswerButton(index))}
-                                    </div>
-                                </div>
-                                
-                                {!showAnswer ? (
-                                    <button
-                                        onClick={handleSubmitAnswer}
-                                        disabled={selectedAnswer === null}
-                                        className="w-full py-3 px-6 rounded-xl
-                                            bg-gradient-to-r from-blue-500 to-purple-500
-                                            text-white font-medium shadow-lg
-                                            hover:opacity-90 transition-all
-                                            disabled:from-gray-400 disabled:to-gray-500"
-                                    >
-                                        Submit Answer
-                                    </button>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {currentQuestion < questions.length - 1 ? (
+                            </div>
+                            
+                            {!showAnswer ? (
+                                <button
+                                    onClick={handleSubmitAnswer}
+                                    disabled={selectedAnswer === null}
+                                    className="w-full py-3 px-6 rounded-xl
+                                        bg-gradient-to-r from-blue-500 to-purple-500
+                                        text-white font-medium shadow-lg
+                                        hover:opacity-90 transition-all
+                                        disabled:from-gray-400 disabled:to-gray-500"
+                                >
+                                    Submit Answer
+                                </button>
+                            ) : (
+                                <div className="space-y-4">
+                                    {currentQuestion < questions.length - 1 ? (
+                                        <button
+                                            onClick={handleNextQuestion}
+                                            className="w-full py-3 px-6 rounded-xl
+                                                bg-gradient-to-r from-blue-500 to-purple-500
+                                                text-white font-medium shadow-lg
+                                                hover:opacity-90 transition-all"
+                                        >
+                                            Next Question
+                                        </button>
+                                    ) : (
+                                        <div className="text-center p-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl">
+                                            <Trophy className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
+                                            <h3 className="text-2xl font-bold text-gray-800 mb-2">Game Over!</h3>
+                                            <p className="text-gray-600 mb-6">
+                                                Final Score: {score}/{questions.length}
+                                                <br />
+                                                ({Math.round((score / questions.length) * 100)}% correct)
+                                            </p>
                                             <button
-                                                onClick={handleNextQuestion}
-                                                className="w-full py-3 px-6 rounded-xl
+                                                onClick={() => {
+                                                    setGameStarted(false);
+                                                    setScore(0);
+                                                    setCurrentQuestion(0);
+                                                }}
+                                                className="py-3 px-6 rounded-xl
                                                     bg-gradient-to-r from-blue-500 to-purple-500
                                                     text-white font-medium shadow-lg
                                                     hover:opacity-90 transition-all"
                                             >
-                                                Next Question
+                                                Play Again
                                             </button>
-                                        ) : (
-                                            <div className="text-center p-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl">
-                                                <TrophyIcon className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
-                                                <h3 className="text-2xl font-bold text-gray-800 mb-2">Game Over!</h3>
-                                                <p className="text-gray-600 mb-6">
-                                                    Final Score: {score}/{questions.length}
-                                                    <br />
-                                                    ({Math.round((score / questions.length) * 100)}% correct)
-                                                    <br />
-                                                    Time Taken: {120 - timeRemaining} seconds
-                                                </p>
-                                                <button
-                                                    onClick={() => {
-                                                        setGameStarted(false);
-                                                        setScore(0);
-                                                        setCurrentQuestion(0);
-                                                        setTimeRemaining(120);
-                                                        setIsGameActive(true);
-                                                    }}
-                                                    className="py-3 px-6 rounded-xl
-                                                        bg-gradient-to-r from-blue-500 to-purple-500
-                                                        text-white font-medium shadow-lg
-                                                        hover:opacity-90 transition-all"
-                                                >
-                                                    Play Again
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>                )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
     );
