@@ -3,11 +3,11 @@ import { Canvas } from '@react-three/fiber';
 import { useAnimations, useGLTF, OrbitControls, Environment } from '@react-three/drei';
 
 // Configure GLTFLoader for your model path
-useGLTF.preload('./runner.glb'); // Adjust this path to where your model is located
+useGLTF.preload("/runner.glb"); // Adjust this path to where your model is located
 
 function Runner({ speed, isRunning }) {
   const group = useRef();
-  const { scene, animations } = useGLTF('./runner.glb'); // Adjust this path as well
+  const { scene, animations } = useGLTF("/runner.glb"); // Adjust this path as well
   const { actions } = useAnimations(animations, group);
 
   useEffect(() => {
@@ -118,6 +118,7 @@ const RunnerGame = ({
         </div>
       </div>
     </div>
+    /*fdfdf*/
   );
 };
 
